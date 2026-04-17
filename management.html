@@ -448,6 +448,8 @@ function renderLiveWithRestoring(restoringId) {
       </div>`;
   }).join("");
 }
+
+function tickTimers() {
   document.querySelectorAll(".oc-timer[data-start]").forEach(el => {
     const secs = Math.floor((Date.now() - new Date(el.dataset.start)) / 1000);
     el.textContent = fmtTimer(secs);
