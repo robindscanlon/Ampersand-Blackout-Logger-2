@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Ampersand Power Monitor — Management</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --red:        #E24B4A;
+  --red-light:  #FCEBEB;
+  --red-border: #F09595;
+  --red-dark:   #A32D2D;
+  --green:      #639922;
+  --green-light:#EAF3DE;
+  --green-dark: #3B6D11;
+  --blue:       #185FA5;
+  --blue-light: #E6F1FB;
+  --gray-50:    #F8F8F6;
+  --gray-100:   #EBEBEB;
+  --gray-400:   #888780;
+  --gray-700:   #444441;
+  --gray-900:   #1A1A19;
+  --radius:     12px;
+  --radius-sm:  8px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-900);
+  min-height: 100vh;
+}
+
+/* ── LOGIN ── */
+#login-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  background: #fff;
+}
+.login-card { width: 100%; max-width: 340px; }
+.login-logo {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 32px;
+}
+.logo-mark {
+  width: 36px; height: 36px;
+  background: var(--red);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-mark svg { width: 20px; height: 20px; }
+.logo-text { font-size: 17px; font-weight: 600; }
+.login-title { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+.login-sub { font-size: 14px; color: var(--gray-400); margin-bottom: 28px; }
+.field { margin-bottom: 16px; }
+.field label { display: block; font-size: 13px; font-weight: 500; color: var(--gray-700); margin-bottom: 6px; }
+input {
+  width: 100%; padding: 12px 14px;
+  border: 1px solid var(--gray-100);
+  border-radius: var(--radius-sm);
+  font-size: 15px; background: #fff;
+  color: var(--gray-900); outline: none;
+}
+input:focus { border-color: var(--blue); }
+.login-error { font-size: 13px; color: var(--red); margin-bottom: 12px; display: none; }
+.btn-primary {
+  width: 100%; padding: 15px;
+  background: var(--blue); color: #fff;
+  border: none; border-radius: var(--radius);
+  font-size: 16px; font-weight: 600;
+  cursor: pointer; transition: opacity 0.15s;
+}
+.btn-primary:active { opacity: 0.85; }
+
+/* ── DASHBOARD ── */
+#dashboard { display: none; }
+
+.header {
+  background: #fff;
+  padding: 16px 20px 14px;
+  border-bottom: 1px solid var(--gray-100);
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 10;
+}
+.header-left { display: flex; align-items: center; gap: 12px; }
+.header-title { font-size: 17px; font-weight: 600; }
+.header-sub { font-size: 12px; color: var(--gray-400); margin-top: 1px; }
+.header-actions { display: flex; align-items: center; gap: 12px; }
+.btn-link {
+  font-size: 13px; color: var(--blue);
+  background: none; border: none; cursor: pointer; padding: 0;
+  text-decoration: none;
+}
+.btn-refresh {
+  font-size: 13px; color: var(--blue);
+  background: none; border: 1px solid var(--gray-100);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px; cursor: pointer;
+}
+.btn-refresh:active { background: var(--gray-50); }
+
+.body { padding: 20px; max-width: 800px; margin: 0 auto; }
+
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 24px; }
+.stat-card {
+  background: #fff; border: 1px solid var(--gray-100);
+  border-radius: var(--radius-sm); padding: 12px 14px;
+}
+.stat-label { font-size: 11px; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+.stat-value { font-size: 26px; font-weight: 600; color: var(--gray-900); }
+.stat-value.danger { color: var(--red); }
+
+.section-title { font-size: 13px; font-weight: 600; color: var(--gray-400); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+
+.tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid var(--gray-100); }
+.tab {
+  padding: 10px 16px; font-size: 14px; color: var(--gray-400);
+  cursor: pointer; border-bottom: 2px solid transparent;
+  margin-bottom: -1px; background: none;
+  border-top: none; border-left: none; border-right: none;
+}
+.tab.active { color: var(--gray-900); border-bottom-color: var(--gray-900); font-weight: 600; }
+
+.outage-card {
+  background: #fff; border: 1px solid var(--gray-100);
+  border-radius: var(--radius-sm); padding: 14px 16px;
+  margin-bottom: 8px; display: flex;
+  align-items: center; justify-content: space-between;
+}
+.outage-card.live { border-left: 3px solid var(--red); }
+.oc-station { font-size: 15px; font-weight: 600; }
+.oc-meta { font-size: 12px; color: var(--gray-400); margin-top: 2px; }
+.oc-timer { font-size: 18px; font-weight: 600; color: var(--red); font-variant-numeric: tabular-nums; min-width: 80px; text-align: right; }
+.oc-duration { font-size: 14px; font-weight: 500; color: var(--gray-400); }
+
+.filter-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.filter-chip {
+  padding: 5px 12px; border: 1px solid var(--gray-100);
+  border-radius: 99px; font-size: 13px; cursor: pointer;
+  background: #fff; color: var(--gray-700);
+}
+.filter-chip.active { background: var(--gray-900); color: #fff; border-color: var(--gray-900); }
+
+.empty-state { text-align: center; padding: 40px 20px; color: var(--gray-400); font-size: 14px; }
+.loading-state { text-align: center; padding: 40px 20px; color: var(--gray-400); font-size: 14px; }
+
+.live-badge {
+  background: var(--red-light); color: var(--red-dark);
+  font-size: 11px; padding: 3px 10px;
+  border-radius: var(--radius-sm); font-weight: 500;
+}
+
+.last-updated { font-size: 11px; color: var(--gray-400); margin-top: 16px; text-align: right; }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 20 20" fill="none">
+          <path d="M10 2L3 11h6l-2 7 9-10h-6l2-8z" fill="white"/>
+        </svg>
+      </div>
+      <span class="logo-text">Ampersand</span>
+    </div>
+    <div class="login-title">Management dashboard</div>
+    <div class="login-sub">Enter the password to continue.</div>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="password-input" placeholder="Password" onkeydown="if(event.key==='Enter')checkPassword()">
+    </div>
+    <div class="login-error" id="login-error">Incorrect password. Try again.</div>
+    <button class="btn-primary" onclick="checkPassword()">Continue</button>
+  </div>
+</div>
+
+<!-- ── DASHBOARD ── -->
+<div id="dashboard">
+  <div class="header">
+    <div>
+      <div class="header-title">Power Monitor</div>
+      <div class="header-sub" id="last-updated-header">All stations</div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-refresh" onclick="refreshAll()">↻ Refresh</button>
+      <a class="btn-link" href="https://script.google.com/macros/s/AKfycbxYCDFUFaMeqJwxdILqQm3BEJdvUf-0n0YT2WWBnN1ddUaRHRmErGRJpAnUWD34T9xiQw/exec" target="_blank">← Station app</a>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Live outages</div>
+        <div class="stat-value danger" id="stat-live">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">This month</div>
+        <div class="stat-value" id="stat-month">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg duration</div>
+        <div class="stat-value" id="stat-avg">—</div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('live')">Live</button>
+      <button class="tab" onclick="switchTab('history')">History</button>
+    </div>
+
+    <div id="panel-live">
+      <div class="section-title">Active now</div>
+      <div id="live-list"><div class="loading-state">Loading...</div></div>
+    </div>
+
+    <div id="panel-history" style="display:none;">
+      <div class="filter-row">
+        <button class="filter-chip active" onclick="setFilter(this,'all')">All</button>
+        <button class="filter-chip" onclick="setFilter(this,'Kenya')">Kenya</button>
+        <button class="filter-chip" onclick="setFilter(this,'Rwanda')">Rwanda</button>
+        <button class="filter-chip" onclick="setFilter(this,'area')">Area outages</button>
+        <button class="filter-chip" onclick="setFilter(this,'station')">Station only</button>
+      </div>
+      <div id="history-list"><div class="loading-state">Loading...</div></div>
+    </div>
+
+    <div class="last-updated" id="last-updated-foot"></div>
+  </div>
+</div>
+
+<script>
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxYCDFUFaMeqJwxdILqQm3BEJdvUf-0n0YT2WWBnN1ddUaRHRmErGRJpAnUWD34T9xiQw/exec";
+const PASSWORD   = "Amperops";
+const SESSION_KEY = "amp_mgmt_auth";
+
+let liveOutages  = {};
+let historyData  = [];
+let historyFilter = "all";
+let activeTab    = "live";
+let timerInterval = null;
+let refreshInterval = null;
+
+// ── AUTH ──
+function checkPassword() {
+  const val = document.getElementById("password-input").value;
+  if (val === PASSWORD) {
+    sessionStorage.setItem(SESSION_KEY, "1");
+    showDashboard();
+  } else {
+    document.getElementById("login-error").style.display = "block";
+    document.getElementById("password-input").value = "";
+    document.getElementById("password-input").focus();
+  }
+}
+
+function showDashboard() {
+  document.getElementById("login-screen").style.display = "none";
+  document.getElementById("dashboard").style.display = "block";
+  refreshAll();
+  refreshInterval = setInterval(loadLive, 30000);
+  timerInterval   = setInterval(tickTimers, 1000);
+}
+
+// Check if already authenticated this session
+window.addEventListener("load", () => {
+  if (sessionStorage.getItem(SESSION_KEY) === "1") showDashboard();
+});
+
+// ── DATA LOADING ──
+async function refreshAll() {
+  await Promise.all([loadLive(), loadHistory()]);
+  const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  document.getElementById("last-updated-header").textContent = `Last updated ${now}`;
+  document.getElementById("last-updated-foot").textContent   = `Last updated ${now}`;
+}
+
+async function loadLive() {
+  try {
+    const res  = await fetch(`${SCRIPT_URL}?action=liveOutages`);
+    const data = await res.json();
+    if (!data.ok) return;
+    liveOutages = {};
+    data.live.forEach(o => { liveOutages[o.id] = o; });
+    renderLive();
+    document.getElementById("stat-live").textContent = data.live.length;
+  } catch(e) {
+    document.getElementById("live-list").innerHTML = '<div class="empty-state">Could not load — check connection</div>';
+  }
+}
+
+async function loadHistory() {
+  try {
+    const res  = await fetch(`${SCRIPT_URL}?action=managementData`);
+    const data = await res.json();
+    if (!data.ok) return;
+    historyData = data.rows;
+    renderHistory();
+    updateStats();
+  } catch(e) {
+    document.getElementById("history-list").innerHTML = '<div class="empty-state">Could not load — check connection</div>';
+  }
+}
+
+// ── RENDER ──
+function renderLive() {
+  const list    = document.getElementById("live-list");
+  const entries = Object.values(liveOutages);
+  if (entries.length === 0) {
+    list.innerHTML = '<div class="empty-state">No active outages</div>';
+    return;
+  }
+  list.innerHTML = entries.map(o => {
+    const secs      = Math.floor((Date.now() - new Date(o.startTime)) / 1000);
+    const startStr  = new Date(o.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const typeLabel = o.type && o.type.toLowerCase().includes("area") ? "Area outage" : "Station only";
+    return `
+      <div class="outage-card live">
+        <div>
+          <div class="oc-station">${o.station}</div>
+          <div class="oc-meta">${o.country} · ${typeLabel} · Started ${startStr}</div>
+        </div>
+        <div class="oc-timer" data-start="${o.startTime}">${fmtTimer(secs)}</div>
+      </div>`;
+  }).join("");
+}
+
+function tickTimers() {
+  document.querySelectorAll(".oc-timer[data-start]").forEach(el => {
+    const secs = Math.floor((Date.now() - new Date(el.dataset.start)) / 1000);
+    el.textContent = fmtTimer(secs);
+  });
+}
+
+function renderHistory() {
+  const list = document.getElementById("history-list");
+  let rows = historyData;
+  if (historyFilter === "Kenya")   rows = rows.filter(r => r.country === "Kenya");
+  if (historyFilter === "Rwanda")  rows = rows.filter(r => r.country === "Rwanda");
+  if (historyFilter === "area")    rows = rows.filter(r => r.type && r.type.toLowerCase().includes("area"));
+  if (historyFilter === "station") rows = rows.filter(r => r.type && r.type.toLowerCase().includes("station"));
+
+  if (rows.length === 0) {
+    list.innerHTML = '<div class="empty-state">No outages found</div>';
+    return;
+  }
+  list.innerHTML = rows.slice(0, 200).map(r => {
+    const startStr = r.start ? new Date(r.start).toLocaleString("en-GB", {
+      day: "2-digit", month: "short", year: "numeric",
+      hour: "2-digit", minute: "2-digit"
+    }) : "—";
+    return `
+      <div class="outage-card">
+        <div>
+          <div class="oc-station">${r.station}</div>
+          <div class="oc-meta">${r.country} · ${r.type || "—"} · ${startStr}</div>
+        </div>
+        <div class="oc-duration">${r.durStr || "—"}</div>
+      </div>`;
+  }).join("");
+}
+
+function updateStats() {
+  const now = new Date();
+  const thisMonth = historyData.filter(r => {
+    const d = new Date(r.start);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  document.getElementById("stat-month").textContent = thisMonth.length;
+  const withDur = historyData.filter(r => r.durMins > 0);
+  if (withDur.length > 0) {
+    const avg = withDur.reduce((s, r) => s + r.durMins, 0) / withDur.length;
+    document.getElementById("stat-avg").textContent = fmtDur(avg);
+  }
+}
+
+// ── UI ──
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll(".tab").forEach((b, i) => {
+    b.classList.toggle("active", ["live","history"][i] === tab);
+  });
+  document.getElementById("panel-live").style.display    = tab === "live"    ? "" : "none";
+  document.getElementById("panel-history").style.display = tab === "history" ? "" : "none";
+}
+
+function setFilter(btn, f) {
+  historyFilter = f;
+  document.querySelectorAll(".filter-chip").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  renderHistory();
+}
+
+function fmtTimer(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  return [h, m, s].map(x => String(x).padStart(2, "0")).join(":");
+}
+
+function fmtDur(mins) {
+  mins = Math.round(mins);
+  if (mins < 60) return mins + " min";
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return m > 0 ? `${h}h ${m}m` : `${h}h`;
+}
+</script>
+</body>
+</html>
