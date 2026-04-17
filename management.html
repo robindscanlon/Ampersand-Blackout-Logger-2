@@ -205,6 +205,15 @@ input:focus { border-color: var(--blue); }
   margin-left: 8px; font-weight: 500;
   white-space: nowrap;
 }
+.restoring-badge {
+  font-size: 11px; color: #185FA5;
+  background: #E6F1FB;
+  border-radius: 99px;
+  padding: 3px 10px; font-weight: 500;
+  margin-left: 8px; white-space: nowrap;
+  animation: fade 1s ease-in-out infinite alternate;
+}
+@keyframes fade { from { opacity: 1; } to { opacity: 0.4; } }
 </style>
 </head>
 <body>
@@ -415,7 +424,30 @@ function renderLive() {
   }).join("");
 }
 
-function tickTimers() {
+function renderLiveWithRestoring(restoringId) {
+  const list    = document.getElementById("live-list");
+  const entries = Object.values(liveOutages);
+  list.innerHTML = entries.map(o => {
+    const secs      = Math.floor((Date.now() - new Date(o.startTime)) / 1000);
+    const startStr  = new Date(o.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const typeLabel = o.type && o.type.toLowerCase().includes("area") ? "Area outage" : "Station only";
+    const isRestoring = o.id === restoringId;
+    return `
+      <div class="outage-card live" style="${isRestoring ? 'opacity:0.6;' : ''}">
+        <div>
+          <div class="oc-station">
+            ${o.station}
+            ${isRestoring
+              ? '<span class="restoring-badge">Restoring power...</span>'
+              : `<button class="restore-chip" onclick="openRestoreModal('${o.id}')">Mark restored</button>`
+            }
+          </div>
+          <div class="oc-meta">${o.country} · ${typeLabel} · Started ${startStr}</div>
+        </div>
+        <div class="oc-timer" data-start="${o.startTime}">${fmtTimer(secs)}</div>
+      </div>`;
+  }).join("");
+}
   document.querySelectorAll(".oc-timer[data-start]").forEach(el => {
     const secs = Math.floor((Date.now() - new Date(el.dataset.start)) / 1000);
     el.textContent = fmtTimer(secs);
@@ -541,10 +573,14 @@ async function submitRestore() {
   const durationMins = (new Date(endTime) - new Date(o.startTime)) / 60000;
   if (durationMins < 0) { alert("Restored time cannot be before the outage started."); return; }
 
-  const btn = document.querySelector(".btn-restore");
-  btn.textContent = "Saving...";
-  btn.disabled = true;
+  // Close immediately and update UI optimistically
+  const outageId = restoreOutageId;
+  closeRestoreModal();
 
+  // Show "restoring..." state on the card instead of removing it immediately
+  renderLiveWithRestoring(outageId);
+
+  // Process in background
   try {
     const payload = {
       action:       "resolveOutage",
@@ -563,17 +599,14 @@ async function submitRestore() {
     });
     const data = await res.json();
     if (data.ok) {
-      closeRestoreModal();
-      await loadLive();
-      await loadHistory();
-    } else {
-      alert("Error saving restore. Please try again.");
+      delete liveOutages[outageId];
+      renderLive();
+      document.getElementById("stat-live").textContent = Object.keys(liveOutages).length;
+      loadHistory();
     }
   } catch(e) {
-    alert("Network error. Please try again.");
-  } finally {
-    btn.textContent = "Confirm power restored";
-    btn.disabled = false;
+    console.error("Restore failed:", e);
+    renderLive(); // revert to normal state on error
   }
 }
 
