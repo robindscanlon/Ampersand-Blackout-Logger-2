@@ -206,12 +206,16 @@ input:focus { border-color: var(--blue); }
   white-space: nowrap;
 }
 .restoring-badge {
-  font-size: 11px; color: #185FA5;
-  background: #E6F1FB;
+  font-size: 11px;
   border-radius: 99px;
   padding: 3px 10px; font-weight: 500;
   margin-left: 8px; white-space: nowrap;
+  color: #185FA5; background: #E6F1FB;
   animation: fade 1s ease-in-out infinite alternate;
+}
+.restoring-badge.done {
+  color: var(--green-dark); background: var(--green-light);
+  animation: none;
 }
 @keyframes fade { from { opacity: 1; } to { opacity: 0.4; } }
 </style>
@@ -424,21 +428,33 @@ function renderLive() {
   }).join("");
 }
 
-function renderLiveWithRestoring(restoringId) {
+function renderLiveWithRestoring(restoringId, restored = false, restoredOutage = null) {
   const list    = document.getElementById("live-list");
   const entries = Object.values(liveOutages);
-  list.innerHTML = entries.map(o => {
+
+  // Build cards — include the restoring/restored card even if already removed from liveOutages
+  const allCards = [...entries];
+  if (restored && restoredOutage && !allCards.find(o => o.id === restoringId)) {
+    allCards.push(restoredOutage);
+  }
+
+  if (allCards.length === 0) {
+    list.innerHTML = '<div class="empty-state">No active outages</div>';
+    return;
+  }
+
+  list.innerHTML = allCards.map(o => {
     const secs      = Math.floor((Date.now() - new Date(o.startTime)) / 1000);
     const startStr  = new Date(o.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     const typeLabel = o.type && o.type.toLowerCase().includes("area") ? "Area outage" : "Station only";
-    const isRestoring = o.id === restoringId;
+    const isTarget  = o.id === restoringId;
     return `
-      <div class="outage-card live" style="${isRestoring ? 'opacity:0.6;' : ''}">
+      <div class="outage-card live" style="${isTarget ? 'opacity:0.5;' : ''}">
         <div>
           <div class="oc-station">
             ${o.station}
-            ${isRestoring
-              ? '<span class="restoring-badge">Restoring power...</span>'
+            ${isTarget
+              ? `<span class="restoring-badge${restored ? ' done' : ''}">${restored ? '✓ Restored' : 'Restoring power...'}</span>`
               : `<button class="restore-chip" onclick="openRestoreModal('${o.id}')">Mark restored</button>`
             }
           </div>
@@ -580,7 +596,7 @@ async function submitRestore() {
   closeRestoreModal();
 
   // Show "restoring..." state on the card instead of removing it immediately
-  renderLiveWithRestoring(outageId);
+  renderLiveWithRestoring(outageId, false, null);
 
   // Process in background
   try {
@@ -601,10 +617,14 @@ async function submitRestore() {
     });
     const data = await res.json();
     if (data.ok) {
+      const restoredOutage = liveOutages[outageId];
       delete liveOutages[outageId];
-      renderLive();
-      document.getElementById("stat-live").textContent = Object.keys(liveOutages).length;
-      loadHistory();
+      renderLiveWithRestoring(outageId, true, restoredOutage);
+      setTimeout(() => {
+        renderLive();
+        document.getElementById("stat-live").textContent = Object.keys(liveOutages).length;
+        loadHistory();
+      }, 1500);
     }
   } catch(e) {
     console.error("Restore failed:", e);
