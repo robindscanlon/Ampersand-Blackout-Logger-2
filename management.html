@@ -156,6 +156,55 @@ input:focus { border-color: var(--blue); }
 }
 
 .last-updated { font-size: 11px; color: var(--gray-400); margin-top: 16px; text-align: right; }
+
+/* ── RESTORE MODAL ── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.5); z-index: 100;
+  align-items: flex-end; justify-content: center; padding: 16px;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: #fff; border-radius: var(--radius) var(--radius) var(--radius-sm) var(--radius-sm);
+  padding: 24px 20px 20px; width: 100%; max-width: 440px;
+}
+.modal-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.modal-sub { font-size: 14px; color: var(--gray-400); margin-bottom: 20px; line-height: 1.5; }
+.modal-station { font-size: 15px; font-weight: 600; color: var(--red-dark); margin-bottom: 20px; padding: 10px 14px; background: var(--red-light); border-radius: var(--radius-sm); }
+.time-options { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+.time-option {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px; border: 1px solid var(--gray-100);
+  border-radius: var(--radius-sm); cursor: pointer;
+  transition: border-color 0.1s;
+}
+.time-option:hover { border-color: var(--green); }
+.time-option input[type="radio"] { accent-color: var(--green); width: 16px; height: 16px; flex-shrink: 0; }
+.time-option-label { font-size: 14px; font-weight: 500; }
+.time-option-sub { font-size: 12px; color: var(--gray-400); }
+#custom-time-row { margin-bottom: 20px; display: none; }
+#custom-time-row label { font-size: 13px; font-weight: 500; color: var(--gray-700); margin-bottom: 6px; display: block; }
+.btn-restore {
+  width: 100%; padding: 15px;
+  background: var(--green); color: #fff;
+  border: none; border-radius: var(--radius);
+  font-size: 16px; font-weight: 600; cursor: pointer;
+  margin-bottom: 8px;
+}
+.btn-cancel {
+  width: 100%; padding: 13px;
+  background: none; border: 1px solid var(--gray-100);
+  border-radius: var(--radius-sm); font-size: 15px;
+  color: var(--gray-400); cursor: pointer;
+}
+.restore-chip {
+  font-size: 11px; color: var(--green-dark);
+  background: var(--green-light);
+  border: none; border-radius: 99px;
+  padding: 3px 10px; cursor: pointer;
+  margin-left: 8px; font-weight: 500;
+  white-space: nowrap;
+}
 </style>
 </head>
 <body>
@@ -236,6 +285,37 @@ input:focus { border-color: var(--blue); }
   </div>
 </div>
 
+<!-- ── MANUAL RESTORE MODAL ── -->
+<div class="modal-overlay" id="restore-modal">
+  <div class="modal">
+    <div class="modal-title">Mark power as restored</div>
+    <div class="modal-sub">Use this if the attendant forgot to press the restore button.</div>
+    <div class="modal-station" id="restore-modal-station">—</div>
+    <div class="time-options">
+      <label class="time-option">
+        <input type="radio" name="restore-time" value="now" checked onchange="toggleCustomTime()">
+        <div>
+          <div class="time-option-label">Just now</div>
+          <div class="time-option-sub">Power restored at the current time</div>
+        </div>
+      </label>
+      <label class="time-option">
+        <input type="radio" name="restore-time" value="custom" onchange="toggleCustomTime()">
+        <div>
+          <div class="time-option-label">Custom time</div>
+          <div class="time-option-sub">Specify when power was actually restored</div>
+        </div>
+      </label>
+    </div>
+    <div id="custom-time-row">
+      <label>Restored at</label>
+      <input type="datetime-local" id="custom-time-input">
+    </div>
+    <button class="btn-restore" onclick="submitRestore()">Confirm power restored</button>
+    <button class="btn-cancel" onclick="closeRestoreModal()">Cancel</button>
+  </div>
+</div>
+
 <script>
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxYCDFUFaMeqJwxdILqQm3BEJdvUf-0n0YT2WWBnN1ddUaRHRmErGRJpAnUWD34T9xiQw/exec";
 const PASSWORD   = "Amperops";
@@ -265,7 +345,7 @@ function showDashboard() {
   document.getElementById("login-screen").style.display = "none";
   document.getElementById("dashboard").style.display = "block";
   refreshAll();
-  refreshInterval = setInterval(loadLive, 30000);
+  refreshInterval = setInterval(loadLive, 10000);
   timerInterval   = setInterval(tickTimers, 1000);
 }
 
@@ -324,7 +404,10 @@ function renderLive() {
     return `
       <div class="outage-card live">
         <div>
-          <div class="oc-station">${o.station}</div>
+          <div class="oc-station">
+            ${o.station}
+            <button class="restore-chip" onclick="openRestoreModal('${o.id}')">Mark restored</button>
+          </div>
           <div class="oc-meta">${o.country} · ${typeLabel} · Started ${startStr}</div>
         </div>
         <div class="oc-timer" data-start="${o.startTime}">${fmtTimer(secs)}</div>
@@ -411,6 +494,93 @@ function fmtDur(mins) {
   const h = Math.floor(mins / 60), m = mins % 60;
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
+
+// ── MANUAL RESTORE ──
+let restoreOutageId = null;
+
+function openRestoreModal(outageId) {
+  restoreOutageId = outageId;
+  const o = liveOutages[outageId];
+  if (!o) return;
+  document.getElementById("restore-modal-station").textContent = `${o.station} · ${o.country}`;
+  // Set custom time input default to now
+  const now = new Date();
+  const localISO = new Date(now - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  document.getElementById("custom-time-input").value = localISO;
+  document.getElementById("custom-time-input").max = localISO;
+  // Reset to "now" option
+  document.querySelector('input[name="restore-time"][value="now"]').checked = true;
+  document.getElementById("custom-time-row").style.display = "none";
+  document.getElementById("restore-modal").classList.add("open");
+}
+
+function closeRestoreModal() {
+  document.getElementById("restore-modal").classList.remove("open");
+  restoreOutageId = null;
+}
+
+function toggleCustomTime() {
+  const isCustom = document.querySelector('input[name="restore-time"]:checked').value === "custom";
+  document.getElementById("custom-time-row").style.display = isCustom ? "block" : "none";
+}
+
+async function submitRestore() {
+  const o = liveOutages[restoreOutageId];
+  if (!o) return;
+
+  const timeChoice = document.querySelector('input[name="restore-time"]:checked').value;
+  let endTime;
+  if (timeChoice === "now") {
+    endTime = new Date().toISOString();
+  } else {
+    const customVal = document.getElementById("custom-time-input").value;
+    if (!customVal) { alert("Please select a time."); return; }
+    endTime = new Date(customVal).toISOString();
+  }
+
+  const durationMins = (new Date(endTime) - new Date(o.startTime)) / 60000;
+  if (durationMins < 0) { alert("Restored time cannot be before the outage started."); return; }
+
+  const btn = document.querySelector(".btn-restore");
+  btn.textContent = "Saving...";
+  btn.disabled = true;
+
+  try {
+    const payload = {
+      action:       "resolveOutage",
+      outageId:     o.id,
+      station:      o.station,
+      country:      o.country,
+      outageType:   o.type,
+      startTime:    o.startTime,
+      endTime:      endTime,
+      durationMins: durationMins,
+    };
+    const res = await fetch(SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (data.ok) {
+      closeRestoreModal();
+      await loadLive();
+      await loadHistory();
+    } else {
+      alert("Error saving restore. Please try again.");
+    }
+  } catch(e) {
+    alert("Network error. Please try again.");
+  } finally {
+    btn.textContent = "Confirm power restored";
+    btn.disabled = false;
+  }
+}
+
+// Close modal on backdrop click
+document.getElementById("restore-modal").addEventListener("click", e => {
+  if (e.target === document.getElementById("restore-modal")) closeRestoreModal();
+});
 </script>
 </body>
 </html>
